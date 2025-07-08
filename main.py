@@ -1,47 +1,31 @@
-from fastapi import FastAPI
-from pydantic import BaseModel
-from otp import send_otp
+from fastapi import FastAPI, Depends
+from sqlalchemy.orm import Session
+from models import SessionLocal, engine, Base
+import crud, schemas
+
+Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
-class RegistrationData(BaseModel):
-    phone: str
-    name: str
-    school: str
-    district: str
-    language: str
-
-class AttendanceData(BaseModel):
-    phone: str
-    students_present: int
-    students_absent: int
-    absence_reason: str
-    topic_covered: str
-
-class OTPRequest(BaseModel):
-    phone: str
-
-class OTPVerify(BaseModel):
-    phone: str
-    otp: str
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 @app.post("/register")
-def register_user(data: RegistrationData):
-    # Save to DB (optional)
-    return {"message": f"Registered {data.name} successfully"}
+def register_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
+    return crud.create_user(db, user)
 
 @app.post("/attendance")
-def submit_attendance(data: AttendanceData):
-    return {"message": "Attendance submitted"}
+def submit_attendance(data: schemas.AttendanceCreate, db: Session = Depends(get_db)):
+    return crud.create_attendance(db, data)
 
-@app.post("/send-otp")
-def send_otp_route(data: OTPRequest):
-    result = send_otp(data.phone)
-    return {"message": result}
+@app.get("/registrations")
+def list_users(db: Session = Depends(get_db)):
+    return crud.get_users(db)
 
-@app.post("/verify-otp")
-def verify_otp(data: OTPVerify):
-    # Dummy check — replace with real verification
-    if data.otp == "123456":
-        return {"message": "OTP verified"}
-    return {"error": "Invalid OTP"}
+@app.get("/attendances")
+def list_attendance(db: Session = Depends(get_db)):
+    return crud.get_attendance(db)
