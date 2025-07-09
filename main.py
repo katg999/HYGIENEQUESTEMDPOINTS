@@ -1,31 +1,136 @@
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from models import SessionLocal, engine, Base
-import crud, schemas
+from pydantic import BaseModel, constr
+from typing import List
 
+from models import SessionLocal, engine, Base
+import crud
+import schemas
+from otp import send_otp, verify_otp
+
+# Create database tables
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI()
+# FastAPI app configuration
+app = FastAPI(
+    title="School Attendance API",
+    description="API for managing user registration and attendance",
+    version="0.1.0"
+)
 
+# Dependency for database session
 def get_db():
+    """Get database session with proper cleanup."""
     db = SessionLocal()
     try:
         yield db
     finally:
         db.close()
 
-@app.post("/register")
+# Pydantic models for request validation
+class PhoneRequest(BaseModel):
+    phone: constr(regex=r"^(0|7)\d{8,9}$")  
+
+class OTPRequest(BaseModel):
+    phone: str
+    otp: str
+
+# User management endpoints
+@app.post("/register", response_model=schemas.User, status_code=status.HTTP_201_CREATED)
 def register_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
-    return crud.create_user(db, user)
+    """Register a new user in the system."""
+    try:
+        return crud.create_user(db, user)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to create user"
+        )
 
-@app.post("/attendance")
-def submit_attendance(data: schemas.AttendanceCreate, db: Session = Depends(get_db)):
-    return crud.create_attendance(db, data)
-
-@app.get("/registrations")
+@app.get("/registrations", response_model=List[schemas.User])
 def list_users(db: Session = Depends(get_db)):
-    return crud.get_users(db)
+    """Get all registered users."""
+    try:
+        return crud.get_users(db)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve users"
+        )
 
-@app.get("/attendances")
+# Attendance management endpoints
+@app.post("/attendance", response_model=schemas.Attendance, status_code=status.HTTP_201_CREATED)
+def submit_attendance(data: schemas.AttendanceCreate, db: Session = Depends(get_db)):
+    """Submit attendance record."""
+    try:
+        return crud.create_attendance(db, data)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to create attendance record"
+        )
+
+@app.get("/attendances", response_model=List[schemas.Attendance])
 def list_attendance(db: Session = Depends(get_db)):
-    return crud.get_attendance(db)
+    """Get all attendance records."""
+    try:
+        return crud.get_attendance(db)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve attendance records"
+        )
+
+# OTP management endpoints
+@app.post("/send-otp")
+def send_otp_endpoint(phone_request: PhoneRequest):
+    """Send OTP to the specified phone number."""
+    try:
+        result = send_otp(phone_request.phone)
+        return {"message": result, "success": True}
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to send OTP"
+        )
+
+@app.post("/verify-otp")
+def verify_otp_endpoint(otp_request: OTPRequest):
+    """Verify OTP for the specified phone number."""
+    try:
+        if verify_otp(otp_request.phone, otp_request.otp):
+            return {"verified": True, "success": True}
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid OTP"
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to verify OTP"
+        )
+
+# Health check endpoint
+@app.get("/health")
+def health_check():
+    """Health check endpoint to verify API status."""
+    return {"status": "healthy", "service": "School Attendance API"}
+
+# Optional: Add API documentation tags for better organization
+@app.get("/", include_in_schema=False)
+def root():
+    """Root endpoint - redirects to API documentation."""
+    return {"message": "Welcome to School Attendance API. Visit /docs for API documentation."}
