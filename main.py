@@ -1,8 +1,9 @@
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import FastAPI, Depends, HTTPException, status,  Field
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, constr
+from typing import Annotated
+import re
 from typing import List
-
 from models import SessionLocal, engine, Base
 import crud
 import schemas
@@ -27,9 +28,16 @@ def get_db():
     finally:
         db.close()
 
-# Pydantic models for request validation
+# Updated PhoneRequest class
 class PhoneRequest(BaseModel):
-    phone: constr(regex=r"^(0|7)\d{8,9}$")  
+    phone: str = Field(..., min_length=9, max_length=10)
+    
+    @field_validator('phone')
+    def validate_phone(cls, v):
+        if not re.match(r'^(0|7)\d{8,9}$', v):
+            raise ValueError('Phone must be 9-10 digits starting with 0 or 7')
+        return v
+    
 
 class OTPRequest(BaseModel):
     phone: str
