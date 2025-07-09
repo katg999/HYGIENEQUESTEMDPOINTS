@@ -14,7 +14,9 @@ logger = logging.getLogger(__name__)
 # Twilio config
 TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")
 TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
-VERIFY_SERVICE_SID = os.getenv("VERIFY_SERVICE_SID")  # New SID from Verify Service
+VERIFY_SERVICE_SID = os.getenv("VERIFY_SERVICE_SID")
+if not VERIFY_SERVICE_SID:
+    raise ValueError("Missing VERIFY_SERVICE_SID. Check environment variables on Render.")
 COUNTRY_CODE = "+256"
 
 # Initialize client
