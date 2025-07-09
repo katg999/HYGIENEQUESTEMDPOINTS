@@ -1,81 +1,75 @@
 import os
-import random
 import logging
-from datetime import datetime, timedelta
+from dotenv import load_dotenv
 from twilio.rest import Client
 from twilio.base.exceptions import TwilioRestException
-from dotenv import load_dotenv
 
-# Configure logging
+# Load environment variables
+load_dotenv()
+
+# Logging setup
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-load_dotenv()
-
-# Configuration
+# Twilio config
 TWILIO_SID = os.getenv("TWILIO_SID")
 TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
-TWILIO_PHONE = os.getenv("TWILIO_PHONE")  # Your +256 Twilio number
-OTP_LENGTH = 6
-OTP_EXPIRY_MINUTES = 5
-MAX_OTP_ATTEMPTS = 3
+VERIFY_SERVICE_SID = os.getenv("VERIFY_SERVICE_SID")  # New SID from Verify Service
 COUNTRY_CODE = "+256"
 
-# In-memory storage (use Redis in production)
-otp_storage = {}
-
-def generate_otp() -> str:
-    """Generate 6-digit OTP"""
-    return str(random.randint(100000, 999999))
+# Initialize client
+client = Client(TWILIO_SID, TWILIO_AUTH_TOKEN)
 
 def format_ugandan_phone(phone: str) -> str:
     """
-    Convert 10-digit Ugandan number to E.164 format
-    Input: '772207616' (10 digits without leading 0)
-    Output: '+256772207616'
+    Formats a local Ugandan phone number to E.164 format.
+    Accepts formats like:
+    - '0772207616'
+    - '772207616'
+    - '+256772207616'
+    - '256772207616'
+    Always returns: '+256772207616'
     """
-    # Remove all non-digit characters
+    # Strip all non-digit characters
     cleaned = ''.join(c for c in phone if c.isdigit())
-    
-    # Handle 10-digit numbers (without 0)
-    if len(cleaned) == 9 and cleaned[0] == '7':  # Ugandan numbers start with 7
-        return f"{COUNTRY_CODE}{cleaned}"
-    
-    # Handle 10-digit numbers (with 0)
-    if len(cleaned) == 10 and cleaned.startswith('0'):
-        return f"{COUNTRY_CODE}{cleaned[1:]}"
-    
-    # Return as-is if already formatted
-    return cleaned if cleaned.startswith('+') else f"+{cleaned}"
 
-def store_otp(phone: str, otp: str):
-    otp_storage[phone] = {
-        'otp': otp,
-        'expires_at': datetime.now() + timedelta(minutes=OTP_EXPIRY_MINUTES),
-        'attempts': 0,
-        'verified': False
-    }
+    # Handle local 10-digit with leading 0 (e.g., 0772...)
+    if len(cleaned) == 10 and cleaned.startswith("0"):
+        return f"{COUNTRY_CODE}{cleaned[1:]}"
+
+    # Handle 9-digit without leading 0 (e.g., 772...)
+    if len(cleaned) == 9 and cleaned.startswith("7"):
+        return f"{COUNTRY_CODE}{cleaned}"
+
+    # Handle if they entered 256772... (national format)
+    if len(cleaned) == 12 and cleaned.startswith("256"):
+        return f"+{cleaned}"
+
+    # Handle already in +256 format
+    if len(cleaned) == 12 and cleaned.startswith("256"):
+        return f"+{cleaned}"
+
+    if cleaned.startswith("256") and len(cleaned) > 12:
+        return f"+{cleaned[:12]}"  # trim extras
+
+    raise ValueError("Unsupported phone number format")
+
 
 def send_otp(phone: str) -> str:
-    """Send OTP to Ugandan number"""
+    """Send OTP using Twilio Verify API"""
     try:
         formatted_phone = format_ugandan_phone(phone)
-        
-        # Validate phone structure
+
+        # Validate
         if not formatted_phone.startswith("+2567") or len(formatted_phone) != 13:
             raise ValueError("Invalid Ugandan phone format")
         
-        otp = generate_otp()
-        store_otp(formatted_phone, otp)
-        
-        client = Client(TWILIO_SID, TWILIO_AUTH_TOKEN)
-        message = client.messages.create(
-            body=f"Your Dettol Hygiene Quest OTP is {otp}. Valid for {OTP_EXPIRY_MINUTES} mins.",
-            from_=TWILIO_PHONE,
-            to=formatted_phone
+        verification = client.verify.services(VERIFY_SERVICE_SID).verifications.create(
+            to=formatted_phone,
+            channel='sms'
         )
-        
-        logger.info(f"OTP sent to {formatted_phone}")
+
+        logger.info(f"OTP sent to {formatted_phone}, SID: {verification.sid}")
         return "OTP sent successfully"
     
     except ValueError as e:
@@ -89,33 +83,18 @@ def send_otp(phone: str) -> str:
         return "OTP service temporarily unavailable"
 
 def verify_otp(phone: str, user_otp: str) -> bool:
-    """Verify user's OTP"""
-    formatted_phone = format_ugandan_phone(phone)
-    
-    if formatted_phone not in otp_storage:
-        return False
-    
-    record = otp_storage[formatted_phone]
-    
-    # Check expiry
-    if datetime.now() > record['expires_at']:
-        del otp_storage[formatted_phone]
-        return False
-    
-    # Check attempts
-    if record['attempts'] >= MAX_OTP_ATTEMPTS:
-        del otp_storage[formatted_phone]
-        return False
-    
-    record['attempts'] += 1
-    
-    if user_otp == record['otp']:
-        record['verified'] = True
-        return True
-    
-    return False
+    """Verify OTP using Twilio Verify API"""
+    try:
+        formatted_phone = format_ugandan_phone(phone)
 
-def is_verified(phone: str) -> bool:
-    """Check verification status"""
-    formatted_phone = format_ugandan_phone(phone)
-    return otp_storage.get(formatted_phone, {}).get('verified', False)
+        check = client.verify.services(VERIFY_SERVICE_SID).verification_checks.create(
+            to=formatted_phone,
+            code=user_otp
+        )
+
+        logger.info(f"Verification check status: {check.status}")
+        return check.status == "approved"
+
+    except Exception as e:
+        logger.error(f"Verification failed: {str(e)}")
+        return False
