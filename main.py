@@ -1,9 +1,9 @@
-from fastapi import FastAPI, Depends, HTTPException, status,  Field
+from fastapi import FastAPI, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from pydantic import BaseModel, constr
-from typing import Annotated
-import re
+from pydantic import BaseModel, Field, field_validator
 from typing import List
+import re
+
 from models import SessionLocal, engine, Base
 import crud
 import schemas
