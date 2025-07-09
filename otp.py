@@ -12,13 +12,13 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Twilio config
-TWILIO_SID = os.getenv("TWILIO_SID")
+TWILIO_ACCOUNT__SID = os.getenv("TWILIO_ACCOUNT_SID")
 TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
 VERIFY_SERVICE_SID = os.getenv("VERIFY_SERVICE_SID")  # New SID from Verify Service
 COUNTRY_CODE = "+256"
 
 # Initialize client
-client = Client(TWILIO_SID, TWILIO_AUTH_TOKEN)
+client = Client(TWILIO_ACCOUNT__SID, TWILIO_AUTH_TOKEN)
 
 def format_ugandan_phone(phone: str) -> str:
     """
