@@ -46,19 +46,14 @@ class OTPRequest(BaseModel):
 # User management endpoints
 @app.post("/register", response_model=schemas.User, status_code=status.HTTP_201_CREATED)
 def register_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
-    """Register a new user in the system."""
     try:
         return crud.create_user(db, user)
     except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to create user"
-        )
+        print(f"❌ Register Error: {e}")  # Log the actual error
+        raise HTTPException(status_code=500, detail=str(e))  # Send real reason back to frontend
+
 
 @app.get("/registrations", response_model=List[schemas.User])
 def list_users(db: Session = Depends(get_db)):
