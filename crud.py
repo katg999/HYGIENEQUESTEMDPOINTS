@@ -3,11 +3,16 @@ from models import User, Attendance
 from schemas import UserCreate, AttendanceCreate
 
 def create_user(db: Session, user: UserCreate):
-    db_user = User(**user.dict())
-    db.add(db_user)
+    db_user = db.query(User).filter(User.phone == user.phone).first()
+    if db_user:
+        raise ValueError("User already exists with this phone number")
+    
+    new_user = User(**user.dict())
+    db.add(new_user)
     db.commit()
-    db.refresh(db_user)
-    return db_user
+    db.refresh(new_user)
+    return new_user
+
 
 def create_attendance(db: Session, attendance: AttendanceCreate):
     db_att = Attendance(**attendance.dict())
