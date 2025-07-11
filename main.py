@@ -3,7 +3,8 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field, field_validator
 from typing import List
 import re
-
+from fastapi.middleware.cors import CORSMiddleware
+from lessonplan import router as lessonplan_router
 from models import SessionLocal, engine, Base
 import crud
 import schemas
@@ -159,3 +160,16 @@ def check_registration(phone: str, db: Session = Depends(get_db)):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to check registration status"
         )
+
+
+
+
+
+app.include_router(lessonplan_router)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
