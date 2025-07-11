@@ -26,3 +26,8 @@ def get_users(db: Session):
 
 def get_attendance(db: Session):
     return db.query(Attendance).all()
+
+
+
+def get_user_by_phone(db: Session, phone: str):
+    return db.query(User).filter(User.phone == phone).first()

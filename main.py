@@ -137,3 +137,25 @@ def health_check():
 def root():
     """Root endpoint - redirects to API documentation."""
     return {"message": "Welcome to School Attendance API. Visit /docs for API documentation."}
+
+
+@app.get("/check-registration/{phone}")
+def check_registration(phone: str, db: Session = Depends(get_db)):
+    """Check if the phone number is already registered."""
+    try:
+        user = crud.get_user_by_phone(db, phone)
+        if user:
+            return {
+                "registered": True,
+                "name": user.name,
+                "school": user.school,
+                "district": user.district,
+                "language": user.language
+            }
+        else:
+            return {"registered": False}
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to check registration status"
+        )
