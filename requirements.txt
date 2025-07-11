@@ -5,3 +5,6 @@ pydantic
 python-dotenv
 twilio
 psycopg2-binary
+requests
+fpdf
+aiofiles
