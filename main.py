@@ -9,7 +9,8 @@ from models import SessionLocal, engine, Base
 import crud
 import schemas
 from otp import send_otp, verify_otp
-
+from models import User, Attendance  # Add this import
+import models  
 # Create database tables
 Base.metadata.create_all(bind=engine)
 
@@ -163,7 +164,24 @@ def check_registration(phone: str, db: Session = Depends(get_db)):
 
 
 
-
+@app.get("/users/{user_id}", response_model=schemas.User)
+def get_specific_user(user_id: int, db: Session = Depends(get_db)):
+    """Get a specific user by ID with district, name, and school information."""
+    try:
+        user = db.query(User).filter(User.id == user_id).first()  # Changed models.User to User
+        if user is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
+        return user
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve user"
+        )
 
 app.include_router(lessonplan_router)
 
