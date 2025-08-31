@@ -85,12 +85,31 @@ def submit_attendance(data: schemas.AttendanceCreate, db: Session = Depends(get_
             detail="Failed to create attendance record"
         )
 
-@app.get("/attendances", response_model=List[schemas.Attendance])
+@app.get("/attendances", response_model=List[dict])
 def list_attendance(db: Session = Depends(get_db)):
-    """Get all attendance records."""
+    """Get all attendance records with user information."""
     try:
-        return crud.get_attendance(db)
+        # Join attendance with users table
+        results = db.query(Attendance, User).join(User, Attendance.phone == User.phone).all()
+        
+        attendance_list = []
+        for attendance, user in results:
+            attendance_data = {
+                "id": attendance.id,
+                "phone": attendance.phone,
+                "students_present": attendance.students_present,
+                "students_absent": attendance.students_absent,
+                "absence_reason": attendance.absence_reason,
+                "topic_covered": attendance.topic_covered,
+                "teacher_name": user.name,
+                "district": user.district,
+                "school": user.school
+            }
+            attendance_list.append(attendance_data)
+        
+        return attendance_list
     except Exception as e:
+        print(f"Error: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to retrieve attendance records"
