@@ -24,7 +24,7 @@ class User(Base):
 class Attendance(Base):
     __tablename__ = "attendance"
     id = Column(Integer, primary_key=True, index=True)
-    phone = Column(String(15), index=True)
+    phone = Column(String(15), index=True)  
     students_present = Column(Integer)
     students_absent = Column(Integer)
     absence_reason = Column(Text)
