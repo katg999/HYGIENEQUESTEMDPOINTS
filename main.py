@@ -100,9 +100,9 @@ def list_attendance(db: Session = Depends(get_db)):
                 "students_present": attendance.students_present,
                 "students_absent": attendance.students_absent,
                 "absence_reason": attendance.absence_reason,
-                "topic_covered": attendance.topic_covered,
+                "subject": attendance.subject,
+                "district": attendance.district,   # from Attendance table
                 "teacher_name": user.name,
-                "district": user.district,
                 "school": user.school
             }
             attendance_list.append(attendance_data)

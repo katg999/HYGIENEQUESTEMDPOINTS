@@ -29,7 +29,8 @@ class AttendanceCreate(BaseModel):
     students_present: int
     students_absent: int
     absence_reason: str
-    topic_covered: str
+    subject: str
+    district: str
 
 class Attendance(BaseModel):
     """Schema for returning attendance records (response model)"""
@@ -38,8 +39,8 @@ class Attendance(BaseModel):
     students_present: int
     students_absent: int
     absence_reason: str
-    topic_covered: str
+    subject: str
+    district: str
 
     class Config:
-        from_attributes = True  # Enables ORM mode
-
+        from_attributes = True

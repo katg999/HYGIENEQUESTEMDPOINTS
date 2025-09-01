@@ -28,7 +28,8 @@ class Attendance(Base):
     students_present = Column(Integer)
     students_absent = Column(Integer)
     absence_reason = Column(Text)
-    topic_covered = Column(Text)
+    subject = Column(Text)   # renamed from topic_covered
+    district = Column(String(100))  # new column added
 
 # Create tables (run once)
 Base.metadata.create_all(bind=engine)
