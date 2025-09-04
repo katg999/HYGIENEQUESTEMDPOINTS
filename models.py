@@ -14,6 +14,14 @@ engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
+
+    # Enum for user roles
+class UserRole(enum.Enum):
+    SUPERADMIN = "superadmin"
+    MANAGER = "manager"
+    FIELDWORKER = "fieldworker"
+
+
 class User(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True, index=True)
@@ -33,11 +41,6 @@ class Attendance(Base):
     subject = Column(Text)   # renamed from topic_covered
     district = Column(String(100))  # new column added
 
-    # Enum for user roles
-class UserRole(enum.Enum):
-    SUPERADMIN = "superadmin"
-    MANAGER = "manager"
-    FIELDWORKER = "fieldworker"
 
 
 class DashboardUser(Base):
