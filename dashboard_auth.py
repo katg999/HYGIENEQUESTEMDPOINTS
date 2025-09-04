@@ -2,12 +2,14 @@ import random
 import time
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from models import SessionLocal, DashboardUser, UserRole
+from models import SessionLocal, DashboardUser as DashboardUserModel, UserRole
 from dashboard_schemas import (
     PhoneRequest, OTPRequest, DashboardUserCreate, 
-    DashboardUser, LoginRequest, LoginVerifyRequest
+    DashboardUser as DashboardUserSchema, LoginRequest, LoginVerifyRequest
 )
 from otp import send_otp, verify_otp
+
+
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
@@ -20,10 +22,16 @@ def get_db():
         db.close()
 
 @router.post("/send-registration-otp")
-async def send_registration_otp(phone_request: PhoneRequest, db: Session = Depends(get_db)):
+async def send_registration_otp(
+    phone_request: PhoneRequest, 
+    db: Session = Depends(get_db)
+):
     """Send OTP for registration"""
     # Check if user already exists
-    existing_user = db.query(DashboardUser).filter(DashboardUser.phone == phone_request.phone).first()
+    existing_user = db.query(DashboardUserModel).filter(
+        DashboardUserModel.phone == phone_request.phone
+    ).first()
+
     if existing_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -52,11 +60,11 @@ async def verify_registration_otp(otp_request: OTPRequest, db: Session = Depends
     
     return {"verified": True}
 
-@router.post("/register", response_model=DashboardUser)
+@router.post("/register", response_model=DashboardUserSchema)
 async def register_user(user_data: DashboardUserCreate, db: Session = Depends(get_db)):
     """Register a new dashboard user"""
     # Check if user already exists
-    existing_user = db.query(DashboardUser).filter(DashboardUser.phone == user_data.phone).first()
+    existing_user = db.query(DashboardUserSchema).filter(DashboardUserSchema.phone == user_data.phone).first()
     
     if existing_user:
         raise HTTPException(
@@ -65,7 +73,7 @@ async def register_user(user_data: DashboardUserCreate, db: Session = Depends(ge
         )
     
     # Create new user
-    db_user = DashboardUser(
+    db_user = DashboardUserSchema(
         phone=user_data.phone,
         name=user_data.name,
         role=user_data.role,
@@ -82,7 +90,7 @@ async def register_user(user_data: DashboardUserCreate, db: Session = Depends(ge
 async def send_login_otp(login_request: LoginRequest, db: Session = Depends(get_db)):
     """Send OTP for login"""
     # Check if user exists
-    user = db.query(DashboardUser).filter(DashboardUser.phone == login_request.phone).first()
+    user = db.query(DashboardUserSchema).filter(DashboardUserSchema.phone == login_request.phone).first()
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -103,7 +111,7 @@ async def send_login_otp(login_request: LoginRequest, db: Session = Depends(get_
 async def login(login_verify: LoginVerifyRequest, db: Session = Depends(get_db)):
     """Login user with OTP verification"""
     # Check if user exists
-    user = db.query(DashboardUser).filter(DashboardUser.phone == login_verify.phone).first()
+    user = db.query(DashboardUserSchema).filter(DashboardUserSchema.phone == login_verify.phone).first()
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
