@@ -31,5 +31,22 @@ class Attendance(Base):
     subject = Column(Text)   # renamed from topic_covered
     district = Column(String(100))  # new column added
 
+    # Enum for user roles
+class UserRole(enum.Enum):
+    SUPERADMIN = "superadmin"
+    MANAGER = "manager"
+    FIELDWORKER = "fieldworker"
+
+
+class DashboardUser(Base):
+    __tablename__ = "dashboard_users"
+    id = Column(Integer, primary_key=True, index=True)
+    phone = Column(String(15), unique=True, index=True)
+    name = Column(String(100))
+    role = Column(Enum(UserRole), default=UserRole.FIELDWORKER)
+    is_verified = Column(Boolean, default=False)
+    otp = Column(String(6), nullable=True)
+    otp_expiry = Column(Integer, nullable=True)  # Store as timestamp
+
 # Create tables (run once)
 Base.metadata.create_all(bind=engine)

@@ -5,6 +5,7 @@ from typing import List
 import re
 from fastapi.middleware.cors import CORSMiddleware
 from lessonplan import router as lessonplan_router
+from dashboard_auth import router as dashboard_router
 from models import SessionLocal, engine, Base
 import crud
 import schemas
@@ -203,6 +204,7 @@ def get_specific_user(user_id: int, db: Session = Depends(get_db)):
         )
 
 app.include_router(lessonplan_router)
+app.include_router(dashboard_router)
 
 app.add_middleware(
     CORSMiddleware,
