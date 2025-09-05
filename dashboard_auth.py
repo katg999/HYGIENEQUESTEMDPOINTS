@@ -1,7 +1,11 @@
 import random
 import time
+import os
+from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
+from jose import jwt
 from models import SessionLocal, DashboardUser as DashboardUserModel, UserRole
 from dashboard_schemas import (
     PhoneRequest, OTPRequest, DashboardUserCreate, 
@@ -11,6 +15,12 @@ from otp import send_otp, verify_otp
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
+# JWT Configuration
+SECRET_KEY = os.getenv("JWT_SECRET_KEY", "fallback-secret-key-for-development")
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 hours
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="dashboard/login")
 # Dependency to get database session
 def get_db():
     db = SessionLocal()
@@ -19,6 +29,12 @@ def get_db():
     finally:
         db.close()
 
+def create_access_token(data: dict):
+    """Create JWT access token"""
+    to_encode = data.copy()
+    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    to_encode.update({"exp": expire})
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 @router.post("/send-registration-otp")
 async def send_registration_otp(phone_request: PhoneRequest, db: Session = Depends(get_db)):
@@ -44,7 +60,7 @@ async def verify_registration_otp(otp_request: OTPRequest, db: Session = Depends
 
     return {"verified": True}
 
-# --------------------- User Registration --------------------- #
+# --------------------- User Registration ---------------------
 @router.post("/register", response_model=DashboardUserSchema)
 async def register_user(user_data: DashboardUserCreate, db: Session = Depends(get_db)):
     """Register a new dashboard user"""
@@ -73,7 +89,6 @@ async def register_user(user_data: DashboardUserCreate, db: Session = Depends(ge
 
     return db_user
 
-
 @router.post("/send-login-otp")
 async def send_login_otp(login_request: LoginRequest, db: Session = Depends(get_db)):
     """Send OTP for login"""
@@ -101,10 +116,14 @@ async def login(login_verify: LoginVerifyRequest, db: Session = Depends(get_db))
     if not verify_otp(login_verify.phone, login_verify.otp):
         raise HTTPException(status_code=400, detail="Invalid OTP")
 
-
+    # Create JWT token with user info
+    access_token = create_access_token(
+        data={"sub": str(user.id), "role": user.role.value}
+    )
+    
     return {
-        "id": user.id,
-        "phone": user.phone,
-        "name": user.name,
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user_id": user.id,
         "role": user.role.value
     }

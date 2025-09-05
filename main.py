@@ -10,7 +10,8 @@ from models import SessionLocal, engine, Base
 import crud
 import schemas
 from otp import send_otp, verify_otp
-from models import User, Attendance  # Add this import
+from models import User, Attendance, UserRole
+from auth import get_current_user  
 import models  
 # Create database tables
 Base.metadata.create_all(bind=engine)
@@ -87,7 +88,10 @@ def submit_attendance(data: schemas.AttendanceCreate, db: Session = Depends(get_
         )
 
 @app.get("/attendances", response_model=List[dict])
-def list_attendance(db: Session = Depends(get_db)):
+def list_attendance(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)  # Add this dependency
+):
     """Get all attendance records with user information."""
     try:
         # Join attendance with users table
@@ -102,10 +106,16 @@ def list_attendance(db: Session = Depends(get_db)):
                 "students_absent": attendance.students_absent,
                 "absence_reason": attendance.absence_reason,
                 "subject": attendance.subject,
-                "district": attendance.district,   # from Attendance table
+                "district": attendance.district,
                 "teacher_name": user.name,
-                "school": user.school
             }
+            
+            # Role-based school masking
+            if current_user["role"] == UserRole.FIELDWORKER:
+                attendance_data["school"] = user.id  # Show ID instead of school name
+            else:
+                attendance_data["school"] = user.school  # Show actual school name
+                
             attendance_list.append(attendance_data)
         
         return attendance_list
