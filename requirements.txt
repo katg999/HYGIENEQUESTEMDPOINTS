@@ -9,3 +9,4 @@ requests
 fpdf
 aiofiles
 python-multipart
+python-jose[cryptography]
