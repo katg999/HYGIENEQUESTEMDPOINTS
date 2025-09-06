@@ -213,17 +213,38 @@ def check_registration(phone: str, db: Session = Depends(get_db)):
 
 
 
-@app.get("/users/{user_id}", response_model=schemas.User)
-def get_specific_user(user_id: int, db: Session = Depends(get_db)):
-    """Get a specific user by ID with district, name, and school information."""
+@app.get("/users/{user_id}", response_model=dict)
+def get_specific_user(
+    user_id: int, 
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """Get a specific user by ID with role-based masking."""
     try:
-        user = db.query(User).filter(User.id == user_id).first()  # Changed models.User to User
+        user = db.query(User).filter(User.id == user_id).first()
         if user is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="User not found"
             )
-        return user
+        
+        # Prepare response data
+        response_data = {
+            "id": user.id,
+            "name": user.name,
+            "school": user.school,
+            "district": user.district,
+            "language": user.language,
+            "phone": user.phone
+        }
+        
+        # Role-based masking for fieldworkers
+        if current_user["role"] == UserRole.FIELDWORKER:
+            response_data["name"] = f"Teacher-{user.id:04d}"
+            response_data["school"] = f"SCH-{user.id:04d}"
+            response_data["district"] = f"District-{(user.id % 100):02d}"
+        
+        return response_data
     except HTTPException:
         raise
     except Exception as e:
@@ -231,7 +252,6 @@ def get_specific_user(user_id: int, db: Session = Depends(get_db)):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to retrieve user"
         )
-
 app.include_router(lessonplan_router)
 app.include_router(dashboard_router)
 
