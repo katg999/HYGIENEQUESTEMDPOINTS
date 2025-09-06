@@ -60,10 +60,25 @@ def register_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
 
 
 @app.get("/registrations", response_model=List[schemas.User])
-def list_users(db: Session = Depends(get_db)):
-    """Get all registered users."""
+def list_users(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """Get all registered users with role-based masking."""
     try:
-        return crud.get_users(db)
+        users = crud.get_users(db)
+        
+        # Apply role-based masking for fieldworkers
+        if current_user["role"] == UserRole.FIELDWORKER:
+            for user in users:
+                # Mask school name with user ID
+                user.school = f"SCH-{user.id:04d}"
+                # Mask teacher name with masked identifier
+                user.name = f"Teacher-{user.id:04d}"
+                # Mask district name with masked identifier
+                user.district = f"District-{(user.id % 100):02d}"
+                
+        return users
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -90,9 +105,9 @@ def submit_attendance(data: schemas.AttendanceCreate, db: Session = Depends(get_
 @app.get("/attendances", response_model=List[dict])
 def list_attendance(
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)  # Add this dependency
+    current_user: dict = Depends(get_current_user)
 ):
-    """Get all attendance records with user information."""
+    """Get all attendance records with role-based masking."""
     try:
         # Join attendance with users table
         results = db.query(Attendance, User).join(User, Attendance.phone == User.phone).all()
@@ -106,15 +121,19 @@ def list_attendance(
                 "students_absent": attendance.students_absent,
                 "absence_reason": attendance.absence_reason,
                 "subject": attendance.subject,
-                "district": attendance.district,
-                "teacher_name": user.name,
+                "district": attendance.district,  # This comes from Attendance table
+                "teacher_name": user.name,        # This comes from User table
+                "school": user.school             # This comes from User table
             }
             
-            # Role-based school masking
+            # Role-based masking for fieldworkers
             if current_user["role"] == UserRole.FIELDWORKER:
-                attendance_data["school"] = user.id  # Show ID instead of school name
-            else:
-                attendance_data["school"] = user.school  # Show actual school name
+                # Mask district from Attendance table
+                attendance_data["district"] = f"DIST-{(attendance.id % 100):02d}"
+                # Mask teacher name from User table
+                attendance_data["teacher_name"] = f"Teacher-{user.id:04d}"
+                # Mask school name from User table
+                attendance_data["school"] = f"SCH-{user.id:04d}"
                 
             attendance_list.append(attendance_data)
         
