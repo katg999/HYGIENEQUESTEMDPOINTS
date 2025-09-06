@@ -42,5 +42,22 @@ class Attendance(BaseModel):
     subject: str
     district: str
 
+
+# New schema for attendance with joined user data
+class AttendanceWithUser(BaseModel):
+    """Schema for attendance records with user information"""
+    id: int
+    phone: str
+    students_present: int
+    students_absent: int
+    absence_reason: str
+    subject: str
+    district: str
+    teacher_name: str
+    school: str
+
+
+
+
     class Config:
         from_attributes = True

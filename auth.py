@@ -6,7 +6,7 @@ from models import UserRole
 import os 
 
 # Get the same secret key as in dashboard_auth.py
-SECRET_KEY = os.getenv("SECRET_KEY", "fallback-secret-key-for-development")
+SECRET_KEY = os.getenv("JWT_SECRET_KEY", "fallback-secret-key-for-development")
 ALGORITHM = "HS256"
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="dashboard/login")
