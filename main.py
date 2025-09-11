@@ -12,7 +12,15 @@ import schemas
 from otp import send_otp, verify_otp
 from models import User, Attendance, UserRole
 from auth import get_current_user  
-import models  
+import models
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+from typing import List
+from models import ExportRequest
+import crud
+import schemas
+from auth import get_current_user
+
 # Create database tables
 Base.metadata.create_all(bind=engine)
 
@@ -252,6 +260,68 @@ def get_specific_user(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to retrieve user"
         )
+    
+    ##Routes for export requests
+export_router = APIRouter(prefix="/dashboard/export-requests", tags=["export-requests"])
+
+@export_router.post("/", response_model=schemas.ExportRequest)
+def create_export_request(
+    export_request: schemas.ExportRequestCreate,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """Create a new export request"""
+    try:
+        return crud.create_export_request(db, export_request)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to create export request: {str(e)}")
+
+@export_router.get("/", response_model=List[schemas.ExportRequest])
+def get_all_export_requests(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """Get all export requests (superadmin only)"""
+    if current_user["role"] != UserRole.SUPERADMIN:
+        raise HTTPException(status_code=403, detail="Only superadmins can view export requests")
+    
+    return crud.get_export_requests(db)
+
+@export_router.patch("/{request_id}", response_model=schemas.ExportRequest)
+def update_export_request(
+    request_id: int,
+    update_data: dict,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """Update export request status (superadmin only)"""
+    if current_user["role"] != UserRole.SUPERADMIN:
+        raise HTTPException(status_code=403, detail="Only superadmins can update export requests")
+    
+    request = crud.get_export_request_by_id(db, request_id)
+    if not request:
+        raise HTTPException(status_code=404, detail="Export request not found")
+    
+    if "status" in update_data and update_data["status"] == "approved":
+        return crud.update_export_request_status(
+            db, request_id, "approved", current_user["name"]
+        )
+    
+    return request
+
+@export_router.get("/user/{user_id}", response_model=List[schemas.ExportRequest])
+def get_user_export_requests(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """Get export requests for a specific user"""
+    if current_user["role"] != UserRole.SUPERADMIN and current_user["id"] != user_id:
+        raise HTTPException(status_code=403, detail="Cannot access other users' requests")
+    
+    return crud.get_user_approved_requests(db, user_id)
+
+# app.include_router(export_router)
 app.include_router(lessonplan_router)
 app.include_router(dashboard_router)
 
