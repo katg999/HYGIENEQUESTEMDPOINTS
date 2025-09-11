@@ -12,6 +12,7 @@ from dashboard_schemas import (
     DashboardUser as DashboardUserSchema, LoginRequest, LoginVerifyRequest
 )
 from otp import send_otp, verify_otp
+from auth import get_current_user
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
@@ -127,3 +128,26 @@ async def login(login_verify: LoginVerifyRequest, db: Session = Depends(get_db))
         "user_id": user.id,
         "role": user.role.value
     }
+
+
+
+# Add this endpoint to get dashboard user details
+@router.get("/users/{user_id}", response_model=DashboardUserSchema)
+def get_dashboard_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """Get dashboard user details by ID"""
+    try:
+        user = db.query(DashboardUserModel).filter(DashboardUserModel.id == user_id).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        # Only allow users to view their own details or superadmins to view anyone
+        if current_user["role"] != UserRole.SUPERADMIN and current_user["id"] != user_id:
+            raise HTTPException(status_code=403, detail="Cannot access other users' details")
+        
+        return user
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch user details: {str(e)}")
