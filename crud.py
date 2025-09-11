@@ -3,6 +3,7 @@ from models import User, Attendance
 from schemas import UserCreate, AttendanceCreate
 from models import ExportRequest
 from schemas import ExportRequestCreate
+from datetime import datetime, timezone
 
 def create_user(db: Session, user: UserCreate):
     db_user = db.query(User).filter(User.phone == user.phone).first()
@@ -56,7 +57,7 @@ def update_export_request_status(db: Session, request_id: int, status: str, appr
         db_request.status = status
         if status == "approved":
             db_request.approved_by = approved_by
-            db_request.approved_at = datetime.utcnow()
+            db_request.approved_at = datetime.now(timezone.utc)
         db.commit()
         db.refresh(db_request)
     return db_request
