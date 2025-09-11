@@ -264,10 +264,21 @@ def create_export_request(
     """Create a new export request"""
     try:
         # Debug: Print the incoming request
-        print(f"Export request data: {export_request.dict()}")
+        print(f"Received export request: {export_request.dict()}")
+        print(f"Current user: {current_user}")
+        
+        # Validate required fields
+        if not export_request.requester_id:
+            raise HTTPException(status_code=422, detail="requester_id is required")
+        if not export_request.requester_name:
+            raise HTTPException(status_code=422, detail="requester_name is required")
+        if not export_request.data_type:
+            raise HTTPException(status_code=422, detail="data_type is required")
+        if not export_request.reason:
+            raise HTTPException(status_code=422, detail="reason is required")
         
         # Verify the requester exists in dashboard_users
-        from models import DashboardUser  # Import at function level to avoid circular imports
+        from models import DashboardUser
         requester = db.query(DashboardUser).filter(DashboardUser.id == export_request.requester_id).first()
         
         if not requester:
@@ -283,7 +294,7 @@ def create_export_request(
     except Exception as e:
         print(f"Error creating export request: {str(e)}")
         import traceback
-        traceback.print_exc()  # This will show the full traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Failed to create export request: {str(e)}")
 
 @export_router.get("/", response_model=List[schemas.ExportRequest])
