@@ -1,6 +1,8 @@
-from sqlalchemy import create_engine, Column, Integer, String, Text, Enum, Boolean
+from sqlalchemy import create_engine, Column, Integer, String, Text, Enum, Boolean, ForeignKey, DateTime
+from sqlalchemy.orm import relationship
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, relationship
+from datetime import datetime
 import os
 import enum
 from dotenv import load_dotenv
@@ -16,7 +18,8 @@ Base = declarative_base()
 
 
     # Enum for user roles
-class UserRole(enum.Enum):
+class UserRole(enum.Enum): 
+
     SUPERADMIN = "superadmin"
     MANAGER = "manager"
     FIELDWORKER = "fieldworker"
@@ -52,6 +55,25 @@ class DashboardUser(Base):
     is_verified = Column(Boolean, default=False)
     otp = Column(String(6), nullable=True)
     otp_expiry = Column(Integer, nullable=True)  # Store as timestamp
+
+
+class ExportRequest(Base):
+    __tablename__ = "export_requests"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    requester_id = Column(Integer, ForeignKey("dashboard_users.id"))
+    requester_name = Column(String(100))
+    requester_phone = Column(String(15))
+    data_type = Column(String(100))  # e.g., "Attendance Analysis", "User Data"
+    record_count = Column(Integer)
+    reason = Column(Text)
+    status = Column(String(20), default="pending")  # pending, approved, rejected
+    created_at = Column(DateTime, default=datetime.utcnow)
+    approved_by = Column(String(100), nullable=True)
+    approved_at = Column(DateTime, nullable=True)
+    
+    # Relationship
+    requester = relationship("DashboardUser")
 
 # Create tables (run once)
 Base.metadata.create_all(bind=engine)
