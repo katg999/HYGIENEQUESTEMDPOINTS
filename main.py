@@ -263,8 +263,27 @@ def create_export_request(
 ):
     """Create a new export request"""
     try:
-        return crud.create_export_request(db, export_request)
+        # Debug: Print the incoming request
+        print(f"Export request data: {export_request.dict()}")
+        
+        # Verify the requester exists in dashboard_users
+        from models import DashboardUser  # Import at function level to avoid circular imports
+        requester = db.query(DashboardUser).filter(DashboardUser.id == export_request.requester_id).first()
+        
+        if not requester:
+            raise HTTPException(status_code=404, detail="Requester not found in dashboard users")
+        
+        # Create the export request
+        result = crud.create_export_request(db, export_request)
+        print(f"Export request created successfully: {result.id}")
+        return result
+        
+    except HTTPException:
+        raise
     except Exception as e:
+        print(f"Error creating export request: {str(e)}")
+        import traceback
+        traceback.print_exc()  # This will show the full traceback
         raise HTTPException(status_code=500, detail=f"Failed to create export request: {str(e)}")
 
 @export_router.get("/", response_model=List[schemas.ExportRequest])
