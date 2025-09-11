@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import FastAPI, Depends, HTTPException, status, APIRouter
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field, field_validator
 from typing import List
@@ -6,20 +6,11 @@ import re
 from fastapi.middleware.cors import CORSMiddleware
 from lessonplan import router as lessonplan_router
 from dashboard_auth import router as dashboard_router
-from models import SessionLocal, engine, Base
+from models import SessionLocal, engine, Base, User, Attendance, UserRole
 import crud
 import schemas
 from otp import send_otp, verify_otp
-from models import User, Attendance, UserRole
 from auth import get_current_user  
-import models
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
-from typing import List
-from models import ExportRequest
-import crud
-import schemas
-from auth import get_current_user
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
@@ -261,7 +252,7 @@ def get_specific_user(
             detail="Failed to retrieve user"
         )
     
-    ##Routes for export requests
+# Routes for export requests
 export_router = APIRouter(prefix="/dashboard/export-requests", tags=["export-requests"])
 
 @export_router.post("/", response_model=schemas.ExportRequest)
@@ -321,7 +312,8 @@ def get_user_export_requests(
     
     return crud.get_user_approved_requests(db, user_id)
 
-# app.include_router(export_router)
+# Include routers
+app.include_router(export_router)
 app.include_router(lessonplan_router)
 app.include_router(dashboard_router)
 
