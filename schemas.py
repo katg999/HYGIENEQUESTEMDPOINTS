@@ -79,7 +79,6 @@ class ExportRequest(BaseModel):
     status: str
     created_at: datetime
     approved_by: Optional[str] = None
-    rejection_reason: Optional[str] = None 
     approved_at: Optional[datetime] = None
 
     class Config:
