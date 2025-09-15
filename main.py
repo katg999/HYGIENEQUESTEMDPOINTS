@@ -22,6 +22,14 @@ app = FastAPI(
     version="0.1.0"
 )
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*", "http://localhost:3000", "http://localhost:3000/dashboard/export-requests"],
+    allow_credentials=True,  
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # Dependency for database session
 def get_db():
     """Get database session with proper cleanup."""
@@ -356,10 +364,3 @@ app.include_router(export_router)
 app.include_router(lessonplan_router)
 app.include_router(dashboard_router)
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*", "http://localhost:3000",],  # Adjust as needed
-    allow_credentials=True,  
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
