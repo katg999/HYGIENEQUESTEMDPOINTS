@@ -24,7 +24,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://dettolhygienequest.com", "http://localhost:3000",],
+    allow_origins=["https://dettolhygienequest.com", "http://localhost:3000", "https://www.dettolhygienequest.com"],
     allow_credentials=True,  
     allow_methods=["*"],
     allow_headers=["*"],
@@ -325,6 +325,10 @@ def update_export_request(
     current_user: dict = Depends(get_current_user)
 ):
     """Update export request status (superadmin only)"""
+    # Debug: Print current user structure
+    print(f"Current user object: {current_user}")
+    print(f"Current user keys: {list(current_user.keys())}")
+    
     if current_user["role"] != UserRole.SUPERADMIN:
         raise HTTPException(status_code=403, detail="Only superadmins can update export requests")
     
@@ -335,11 +339,13 @@ def update_export_request(
     status = update_data.get("status")
     
     if status == "approved":
+        # Use a fallback if name is not available
+        approved_by = current_user.get("name") or "Super Admin"
+        print(f"Using approved_by: {approved_by}")
         return crud.update_export_request_status(
-            db, request_id, "approved", current_user["name"]
+            db, request_id, "approved", approved_by
         )
     elif status == "rejected":
-        # For rejection, we don't need a reason for now
         return crud.update_export_request_status(db, request_id, "rejected")
     
     return request

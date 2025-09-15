@@ -119,7 +119,7 @@ async def login(login_verify: LoginVerifyRequest, db: Session = Depends(get_db))
 
     # Create JWT token with user info
     access_token = create_access_token(
-        data={"sub": str(user.id), "role": user.role.value}
+        data={"sub": str(user.id), "role": user.role.value, "name": user.name}
     )
     
     return {
