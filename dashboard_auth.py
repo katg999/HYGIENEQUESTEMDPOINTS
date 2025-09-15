@@ -125,6 +125,8 @@ async def login(login_verify: LoginVerifyRequest, db: Session = Depends(get_db))
     return {
         "access_token": access_token,
         "token_type": "bearer",
+        "name": user.name,
+        "phone": user.phone,
         "user_id": user.id,
         "role": user.role.value
     }
