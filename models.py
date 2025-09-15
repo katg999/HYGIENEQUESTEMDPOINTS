@@ -68,7 +68,6 @@ class ExportRequest(Base):
     reason = Column(Text)
     status = Column(String(20), default="pending")  # pending, approved, rejected
     created_at = Column(DateTime, default=datetime.utcnow)
-    rejection_reason = Column(Text, nullable=True)
     approved_by = Column(String(100), nullable=True)
     approved_at = Column(DateTime, nullable=True)
     

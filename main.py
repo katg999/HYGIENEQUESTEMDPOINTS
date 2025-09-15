@@ -325,18 +325,14 @@ def update_export_request(
         raise HTTPException(status_code=404, detail="Export request not found")
     
     status = update_data.get("status")
-    rejection_reason = update_data.get("rejection_reason")
     
     if status == "approved":
         return crud.update_export_request_status(
             db, request_id, "approved", current_user["name"]
         )
     elif status == "rejected":
-        if not rejection_reason:
-            raise HTTPException(status_code=400, detail="Rejection reason is required")
-        return crud.update_export_request_status(
-            db, request_id, "rejected", rejection_reason=rejection_reason
-        )
+        # For rejection, we don't need a reason for now
+        return crud.update_export_request_status(db, request_id, "rejected")
     
     return request
 
@@ -362,7 +358,7 @@ app.include_router(dashboard_router)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*", "http://localhost:3000",],  # Adjust as needed
     allow_credentials=True,  
     allow_methods=["*"],
     allow_headers=["*"],
