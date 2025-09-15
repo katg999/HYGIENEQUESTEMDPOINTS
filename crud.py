@@ -67,3 +67,30 @@ def get_user_approved_requests(db: Session, user_id: int):
         ExportRequest.requester_id == user_id,
         ExportRequest.status == "approved"
     ).all()
+
+
+
+def update_export_request_status(db: Session, request_id: int, status: str, approved_by: str = None, rejection_reason: str = None):
+    db_request = db.query(ExportRequest).filter(ExportRequest.id == request_id).first()
+    if db_request:
+        db_request.status = status
+        if status == "approved":
+            db_request.approved_by = approved_by
+            db_request.approved_at = datetime.now(timezone.utc)
+            db_request.rejection_reason = None  # Clear rejection reason if approved
+        elif status == "rejected":
+            db_request.rejection_reason = rejection_reason
+        db.commit()
+        db.refresh(db_request)
+    return db_request
+
+def get_user_approved_requests(db: Session, user_id: int):
+    return db.query(ExportRequest).filter(
+        ExportRequest.requester_id == user_id,
+        ExportRequest.status == "approved"
+    ).all()
+
+def get_user_requests(db: Session, user_id: int):
+    return db.query(ExportRequest).filter(
+        ExportRequest.requester_id == user_id
+    ).order_by(ExportRequest.created_at.desc()).all()
