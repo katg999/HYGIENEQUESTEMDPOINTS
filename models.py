@@ -59,7 +59,6 @@ class DashboardUser(Base):
 
 class ExportRequest(Base):
     __tablename__ = "export_requests"
-    
     id = Column(Integer, primary_key=True, index=True)
     requester_id = Column(Integer, ForeignKey("dashboard_users.id"))
     requester_name = Column(String(100))
@@ -69,6 +68,7 @@ class ExportRequest(Base):
     reason = Column(Text)
     status = Column(String(20), default="pending")  # pending, approved, rejected
     created_at = Column(DateTime, default=datetime.utcnow)
+    rejection_reason = Column(Text, nullable=True)
     approved_by = Column(String(100), nullable=True)
     approved_at = Column(DateTime, nullable=True)
     

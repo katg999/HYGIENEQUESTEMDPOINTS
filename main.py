@@ -308,6 +308,8 @@ def get_all_export_requests(
     
     return crud.get_export_requests(db)
 
+# Update the PATCH endpoint
+# Update the PATCH endpoint
 @export_router.patch("/{request_id}", response_model=schemas.ExportRequest)
 def update_export_request(
     request_id: int,
@@ -323,12 +325,47 @@ def update_export_request(
     if not request:
         raise HTTPException(status_code=404, detail="Export request not found")
     
-    if "status" in update_data and update_data["status"] == "approved":
+    status = update_data.get("status")
+    rejection_reason = update_data.get("rejection_reason")
+    
+    if status == "approved":
         return crud.update_export_request_status(
             db, request_id, "approved", current_user["name"]
         )
+    elif status == "rejected":
+        if not rejection_reason:
+            raise HTTPException(status_code=400, detail="Rejection reason is required")
+        return crud.update_export_request_status(
+            db, request_id, "rejected", rejection_reason=rejection_reason
+        )
     
     return request
+
+# Add a new endpoint to get all requests for a user
+@export_router.get("/user/{user_id}", response_model=List[schemas.ExportRequest])
+def get_user_export_requests(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """Get all export requests for a specific user"""
+    if current_user["role"] != UserRole.SUPERADMIN and current_user["id"] != user_id:
+        raise HTTPException(status_code=403, detail="Cannot access other users' requests")
+    
+    return crud.get_user_requests(db, user_id)
+
+# Add a new endpoint to get all requests for a user
+@export_router.get("/user/{user_id}", response_model=List[schemas.ExportRequest])
+def get_user_export_requests(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """Get all export requests for a specific user"""
+    if current_user["role"] != UserRole.SUPERADMIN and current_user["id"] != user_id:
+        raise HTTPException(status_code=403, detail="Cannot access other users' requests")
+    
+    return crud.get_user_requests(db, user_id)
 
 @export_router.get("/user/{user_id}", response_model=List[schemas.ExportRequest])
 def get_user_export_requests(

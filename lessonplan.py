@@ -21,7 +21,7 @@ HF_TOKEN = os.getenv("HF_TOKEN")
 router = APIRouter()
 
 def analyze_image_score(image_path: str) -> Tuple[int, str]:
-    """
+    """ 
     Analyze lesson plan image using Hugging Face endpoint with improved error handling
     Returns a tuple of (score, caption)
     """
