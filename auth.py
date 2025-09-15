@@ -16,13 +16,22 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         user_id: str = payload.get("sub")
         role: str = payload.get("role")
+        name: str = payload.get("name")  # Add this line
+        
         if user_id is None or role is None:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid authentication credentials",
                 headers={"WWW-Authenticate": "Bearer"},
             )
-        return {"id": int(user_id), "role": UserRole(role)}
+        
+        # Return user data including name
+        user_data = {"id": int(user_id), "role": UserRole(role)}
+        if name:
+            user_data["name"] = name
+            
+        return user_data
+        
     except JWTError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
