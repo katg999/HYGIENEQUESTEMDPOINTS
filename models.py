@@ -46,6 +46,21 @@ class Attendance(Base):
 
 
 
+    # Add to your existing models.py
+class LessonPlan(Base):
+    __tablename__ = "lesson_plans"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    phone = Column(String(15), index=True)
+    score = Column(Integer)
+    subject = Column(String(100))
+    feedback = Column(Text)  # Store key feedback points
+    image_path = Column(String(255))  # Store path to the uploaded image
+    original_filename = Column(String(255))
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+
 class DashboardUser(Base):
     __tablename__ = "dashboard_users"
     id = Column(Integer, primary_key=True, index=True)

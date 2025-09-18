@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, status, APIRouter
+from fastapi import FastAPI, Depends, HTTPException, status, APIRouter, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field, field_validator
 from typing import List
@@ -8,9 +8,12 @@ from lessonplan import router as lessonplan_router
 from dashboard_auth import router as dashboard_router
 from models import SessionLocal, engine, Base, User, Attendance, UserRole
 import crud
-import schemas
+from schemas  import LessonPlanCreate
+from models import LessonPlan as LessonPlanModel
 from otp import send_otp, verify_otp
-from auth import get_current_user  
+from auth import get_current_user
+import os
+from spaces_storage import do_spaces
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
@@ -29,6 +32,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# Configure upload directory
+UPLOAD_DIR = "lesson_plan_uploads"
+os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 # Dependency for database session
 def get_db():
@@ -363,6 +371,120 @@ def get_user_export_requests(
         raise HTTPException(status_code=403, detail="Cannot access other users' requests")
     
     return crud.get_user_requests(db, user_id)
+
+
+#LessonUploadFunctionalityToGoogleCloudSQLAnd
+
+@app.post("/lessonplan/upload")
+async def upload_lesson_plan(
+    file: UploadFile = File(...),
+    score: int = Form(...),
+    subject: str = Form(...),
+    feedback: str = Form(...),
+    phone: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    """Upload lesson plan image to Digital Ocean Spaces and store metadata in DB"""
+    try:
+        # Read file content
+        file_content = await file.read()
+        
+        # Upload to Digital Ocean Spaces
+        upload_result = do_spaces.upload_file(
+            file_content, 
+            file.filename,
+            content_type=file.content_type
+        )
+        
+        if not upload_result["success"]:
+            raise HTTPException(
+                status_code=500, 
+                detail=f"Digital Ocean Spaces upload failed: {upload_result['error']}"
+            )
+        
+        # Create database record
+        lesson_plan_data = {
+            "phone": phone,
+            "score": score,
+            "subject": subject,
+            "feedback": feedback,
+            "spaces_file_path": upload_result["file_path"],
+            "original_filename": upload_result["filename"],
+            "public_url": upload_result["public_url"]
+        }
+        
+        lesson_plan = crud.create_lesson_plan(db, LessonPlanCreate(**lesson_plan_data))
+        
+        return {
+            "success": True,
+            "message": "Lesson plan uploaded successfully",
+            "id": lesson_plan.id,
+            "image_url": upload_result["public_url"]
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to upload lesson plan: {str(e)}"
+        )
+
+@app.get("/lessonplan/image/{lesson_plan_id}")
+async def get_lesson_plan_image(
+    lesson_plan_id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """Get the lesson plan image URL"""
+    try:
+        lesson_plan = db.query(LessonPlanModel).filter(LessonPlanModel.id == lesson_plan_id).first()
+        
+        if not lesson_plan:
+            raise HTTPException(status_code=404, detail="Lesson plan not found")
+        
+        # For additional security, generate a presigned URL instead of using public URL
+        # presigned_url = do_spaces.generate_presigned_url(lesson_plan.spaces_file_path)
+        
+        return {
+            "image_url": lesson_plan.public_url,
+            "filename": lesson_plan.original_filename
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve lesson plan image: {str(e)}"
+        )
+
+@app.delete("/lessonplan/{lesson_plan_id}")
+async def delete_lesson_plan(
+    lesson_plan_id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """Delete a lesson plan and its associated file"""
+    try:
+        if current_user["role"] != UserRole.SUPERADMIN:
+            raise HTTPException(status_code=403, detail="Not authorized")
+        
+        lesson_plan = db.query(LessonPlanModel).filter(LessonPlanModel.id == lesson_plan_id).first()
+        
+        if not lesson_plan:
+            raise HTTPException(status_code=404, detail="Lesson plan not found")
+        
+        # Delete file from Digital Ocean Spaces
+        do_spaces.delete_file(lesson_plan.spaces_file_path)
+        
+        # Delete database record
+        db.delete(lesson_plan)
+        db.commit()
+        
+        return {"success": True, "message": "Lesson plan deleted successfully"}
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete lesson plan: {str(e)}"
+        )
 
 
 

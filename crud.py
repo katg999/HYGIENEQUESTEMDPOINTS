@@ -4,6 +4,8 @@ from schemas import UserCreate, AttendanceCreate
 from models import ExportRequest
 from schemas import ExportRequestCreate
 from datetime import datetime, timezone
+from models import LessonPlan
+from schemas import LessonPlanCreate
 
 def create_user(db: Session, user: UserCreate):
     db_user = db.query(User).filter(User.phone == user.phone).first()
@@ -91,3 +93,13 @@ def get_user_requests(db: Session, user_id: int):
     return db.query(ExportRequest).filter(
         ExportRequest.requester_id == user_id
     ).order_by(ExportRequest.created_at.desc()).all()
+
+
+
+def create_lesson_plan(db: Session, lesson_plan: LessonPlanCreate):
+    """Create a new lesson plan record with original image reference"""
+    db_lesson_plan = LessonPlan(**lesson_plan.dict())
+    db.add(db_lesson_plan)
+    db.commit()
+    db.refresh(db_lesson_plan)
+    return db_lesson_plan
