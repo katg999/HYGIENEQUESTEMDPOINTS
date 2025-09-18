@@ -410,39 +410,33 @@ async def upload_lesson_plan(
     try:
         logger.info(f"📥 Upload attempt: phone={phone}, score={score}, subject={subject}")
 
-        # Validate file type
-        if not file.content_type.startswith("image/"):
-            raise HTTPException(status_code=400, detail="Only image files allowed")
-
-        # Save to DigitalOcean
-        file_ext = file.filename.split(".")[-1] if "." in file.filename else ""
-        unique_name = f"{uuid.uuid4()}.{file_ext}" if file_ext else f"{uuid.uuid4()}"
-        file_path = f"lesson_plans/{datetime.now().strftime('%Y/%m/%d')}/{unique_name}"
-
-        # Upload file to Digital Ocean Spaces
-        s3_client.upload_fileobj(
-            file.file, 
-            DO_BUCKET, 
-            file_path, 
-            ExtraArgs={
-                "ACL": "public-read",
-                "ContentType": file.content_type
-            }
+        # Read file content
+        file_content = await file.read()
+        
+        # Use your DigitalOcean Spaces utility
+        upload_result = do_spaces.upload_file(
+            file_content, 
+            file.filename,
+            content_type=file.content_type
         )
         
-        file_url = f"https://{DO_BUCKET}.{DO_REGION}.digitaloceanspaces.com/{file_path}"
+        if not upload_result["success"]:
+            raise HTTPException(
+                status_code=500, 
+                detail=f"Upload failed: {upload_result.get('error', 'Unknown error')}"
+            )
 
-        logger.info(f"✅ File uploaded: {file_url}")
+        logger.info(f"✅ File uploaded: {upload_result['public_url']}")
 
-        # Save to DB - Make sure you have the correct model structure
+        # Save to DB
         lesson_plan = LessonPlan(
             phone=phone,
             score=score,
             subject=subject,
             feedback=feedback,
-            spaces_file_path=file_path,  # Changed from file_url to match model
+            spaces_file_path=upload_result["file_path"],
             original_filename=file.filename,
-            public_url=file_url,
+            public_url=upload_result["public_url"],
             created_at=datetime.utcnow()
         )
         
@@ -453,13 +447,72 @@ async def upload_lesson_plan(
         return {
             "success": True, 
             "id": lesson_plan.id,
-            "image_url": file_url,
+            "image_url": upload_result["public_url"],
             "message": "Lesson plan uploaded successfully"
         }
         
+    except HTTPException:
+        raise
     except Exception as e:
         logger.exception("❌ Upload failed")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
+async def upload_lesson_plan(
+    file: UploadFile = File(...),
+    phone: str = Form(...),
+    score: int = Form(...),
+    subject: str = Form(...),
+    feedback: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    try:
+        logger.info(f"📥 Upload attempt: phone={phone}, score={score}, subject={subject}")
+
+        # Read file content
+        file_content = await file.read()
+        
+        # Use your DigitalOcean Spaces utility
+        upload_result = do_spaces.upload_file(
+            file_content, 
+            file.filename,
+            content_type=file.content_type
+        )
+        
+        if not upload_result["success"]:
+            raise HTTPException(
+                status_code=500, 
+                detail=f"Upload failed: {upload_result.get('error', 'Unknown error')}"
+            )
+
+        logger.info(f"✅ File uploaded: {upload_result['public_url']}")
+
+        # Save to DB
+        lesson_plan = LessonPlan(
+            phone=phone,
+            score=score,
+            subject=subject,
+            feedback=feedback,
+            spaces_file_path=upload_result["file_path"],
+            original_filename=file.filename,
+            public_url=upload_result["public_url"],
+            created_at=datetime.utcnow()
+        )
+        
+        db.add(lesson_plan)
+        db.commit()
+        db.refresh(lesson_plan)
+
+        return {
+            "success": True, 
+            "id": lesson_plan.id,
+            "image_url": upload_result["public_url"],
+            "message": "Lesson plan uploaded successfully"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("❌ Upload failed")
+        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
     
 
 @app.get("/lessonplan/image/{lesson_plan_id}")
