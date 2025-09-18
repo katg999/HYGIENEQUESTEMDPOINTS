@@ -9,13 +9,21 @@ from dashboard_auth import router as dashboard_router
 from models import SessionLocal, engine, Base, User, Attendance, UserRole
 import crud
 from schemas  import LessonPlanCreate
-from models import LessonPlan as LessonPlanModel
+from models import LessonPlan 
 from otp import send_otp, verify_otp
 from auth import get_current_user
 import os
 import schemas
 from spaces_storage import do_spaces
+import logging
+import uuid
+from datetime import datetime
+import boto3
 
+
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 # Create database tables
 Base.metadata.create_all(bind=engine)
 
@@ -35,9 +43,6 @@ app.add_middleware(
 )
 
 
-# Configure upload directory
-UPLOAD_DIR = "lesson_plan_uploads"
-os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 # Dependency for database session
 def get_db():
@@ -47,6 +52,23 @@ def get_db():
         yield db
     finally:
         db.close()
+
+
+        # Load DigitalOcean Spaces credentials - Use the same names as in Render
+DO_SPACES_ACCESS_KEY = os.getenv("DO_SPACES_ACCESS_KEY")
+DO_SPACES_SECRET_KEY = os.getenv("DO_SPACES_SECRET_KEY")
+DO_SPACES_REGION = os.getenv("DO_SPACES_REGION", "nyc3")
+DO_SPACES_BUCKET = os.getenv("DO_SPACES_BUCKET", "hygienequest-lesson-plans")
+DO_SPACES_ENDPOINT = f"https://{DO_SPACES_REGION}.digitaloceanspaces.com"
+
+# Initialize S3 client
+s3_client = boto3.client(
+    "s3",
+    endpoint_url=DO_SPACES_ENDPOINT,
+    aws_access_key_id=DO_SPACES_ACCESS_KEY,
+    aws_secret_access_key=DO_SPACES_SECRET_KEY,
+    region_name=DO_SPACES_REGION
+)
 
 # Updated PhoneRequest class
 class PhoneRequest(BaseModel):
@@ -393,32 +415,52 @@ async def upload_lesson_plan(
             raise HTTPException(status_code=400, detail="Only image files allowed")
 
         # Save to DigitalOcean
-        file_ext = file.filename.split(".")[-1]
-        unique_name = f"{uuid.uuid4()}.{file_ext}"
+        file_ext = file.filename.split(".")[-1] if "." in file.filename else ""
+        unique_name = f"{uuid.uuid4()}.{file_ext}" if file_ext else f"{uuid.uuid4()}"
         file_path = f"lesson_plans/{datetime.now().strftime('%Y/%m/%d')}/{unique_name}"
 
-        s3_client.upload_fileobj(file.file, DO_BUCKET, file_path, ExtraArgs={"ACL": "public-read"})
+        # Upload file to Digital Ocean Spaces
+        s3_client.upload_fileobj(
+            file.file, 
+            DO_BUCKET, 
+            file_path, 
+            ExtraArgs={
+                "ACL": "public-read",
+                "ContentType": file.content_type
+            }
+        )
+        
         file_url = f"https://{DO_BUCKET}.{DO_REGION}.digitaloceanspaces.com/{file_path}"
 
         logger.info(f"✅ File uploaded: {file_url}")
 
-        # Save to DB
+        # Save to DB - Make sure you have the correct model structure
         lesson_plan = LessonPlan(
             phone=phone,
             score=score,
             subject=subject,
             feedback=feedback,
-            file_url=file_url,
+            spaces_file_path=file_path,  # Changed from file_url to match model
+            original_filename=file.filename,
+            public_url=file_url,
             created_at=datetime.utcnow()
         )
+        
         db.add(lesson_plan)
         db.commit()
         db.refresh(lesson_plan)
 
-        return {"success": True, "lesson_plan": lesson_plan.to_dict()}
+        return {
+            "success": True, 
+            "id": lesson_plan.id,
+            "image_url": file_url,
+            "message": "Lesson plan uploaded successfully"
+        }
+        
     except Exception as e:
         logger.exception("❌ Upload failed")
         raise HTTPException(status_code=500, detail=str(e))
+    
 
 @app.get("/lessonplan/image/{lesson_plan_id}")
 async def get_lesson_plan_image(
@@ -428,7 +470,7 @@ async def get_lesson_plan_image(
 ):
     """Get the lesson plan image URL"""
     try:
-        lesson_plan = db.query(LessonPlanModel).filter(LessonPlanModel.id == lesson_plan_id).first()
+        lesson_plan = db.query(LessonPlan).filter(LessonPlan.id == lesson_plan_id).first()
         
         if not lesson_plan:
             raise HTTPException(status_code=404, detail="Lesson plan not found")
@@ -458,7 +500,7 @@ async def delete_lesson_plan(
         if current_user["role"] != UserRole.SUPERADMIN:
             raise HTTPException(status_code=403, detail="Not authorized")
         
-        lesson_plan = db.query(LessonPlanModel).filter(LessonPlanModel.id == lesson_plan_id).first()
+        lesson_plan = db.query(LessonPlan).filter(LessonPlan.id == lesson_plan_id).first()
         
         if not lesson_plan:
             raise HTTPException(status_code=404, detail="Lesson plan not found")
