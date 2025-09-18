@@ -376,7 +376,7 @@ def get_user_export_requests(
 
 #LessonUploadFunctionalityToGoogleCloudSQLAnd
 
-@router.post("/lessonplan/upload")
+@app.post("/lessonplan/upload")
 async def upload_lesson_plan(
     file: UploadFile = File(...),
     phone: str = Form(...),
@@ -419,7 +419,6 @@ async def upload_lesson_plan(
     except Exception as e:
         logger.exception("❌ Upload failed")
         raise HTTPException(status_code=500, detail=str(e))
-
 
 @app.get("/lessonplan/image/{lesson_plan_id}")
 async def get_lesson_plan_image(
