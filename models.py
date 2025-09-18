@@ -16,7 +16,6 @@ engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
-
     # Enum for user roles
 class UserRole(enum.Enum): 
 
@@ -46,7 +45,6 @@ class Attendance(Base):
 
 
 
-    # Add to your existing models.py
 class LessonPlan(Base):
     __tablename__ = "lesson_plans"
     
@@ -54,9 +52,10 @@ class LessonPlan(Base):
     phone = Column(String(15), index=True)
     score = Column(Integer)
     subject = Column(String(100))
-    feedback = Column(Text)  # Store key feedback points
-    image_path = Column(String(255))  # Store path to the uploaded image
+    feedback = Column(Text)
+    spaces_file_path = Column(String(255))  # Path in Digital Ocean Spaces
     original_filename = Column(String(255))
+    public_url = Column(String(500))  # Public URL for the image
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
