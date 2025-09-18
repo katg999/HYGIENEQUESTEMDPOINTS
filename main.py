@@ -376,58 +376,50 @@ def get_user_export_requests(
 
 #LessonUploadFunctionalityToGoogleCloudSQLAnd
 
-@app.post("/lessonplan/upload")
+@router.post("/lessonplan/upload")
 async def upload_lesson_plan(
     file: UploadFile = File(...),
+    phone: str = Form(...),
     score: int = Form(...),
     subject: str = Form(...),
     feedback: str = Form(...),
-    phone: str = Form(...),
     db: Session = Depends(get_db)
 ):
-    """Upload lesson plan image to Digital Ocean Spaces and store metadata in DB"""
     try:
-        # Read file content
-        file_content = await file.read()
-        
-        # Upload to Digital Ocean Spaces
-        upload_result = do_spaces.upload_file(
-            file_content, 
-            file.filename,
-            content_type=file.content_type
+        logger.info(f"📥 Upload attempt: phone={phone}, score={score}, subject={subject}")
+
+        # Validate file type
+        if not file.content_type.startswith("image/"):
+            raise HTTPException(status_code=400, detail="Only image files allowed")
+
+        # Save to DigitalOcean
+        file_ext = file.filename.split(".")[-1]
+        unique_name = f"{uuid.uuid4()}.{file_ext}"
+        file_path = f"lesson_plans/{datetime.now().strftime('%Y/%m/%d')}/{unique_name}"
+
+        s3_client.upload_fileobj(file.file, DO_BUCKET, file_path, ExtraArgs={"ACL": "public-read"})
+        file_url = f"https://{DO_BUCKET}.{DO_REGION}.digitaloceanspaces.com/{file_path}"
+
+        logger.info(f"✅ File uploaded: {file_url}")
+
+        # Save to DB
+        lesson_plan = LessonPlan(
+            phone=phone,
+            score=score,
+            subject=subject,
+            feedback=feedback,
+            file_url=file_url,
+            created_at=datetime.utcnow()
         )
-        
-        if not upload_result["success"]:
-            raise HTTPException(
-                status_code=500, 
-                detail=f"Digital Ocean Spaces upload failed: {upload_result['error']}"
-            )
-        
-        # Create database record
-        lesson_plan_data = {
-            "phone": phone,
-            "score": score,
-            "subject": subject,
-            "feedback": feedback,
-            "spaces_file_path": upload_result["file_path"],
-            "original_filename": upload_result["filename"],
-            "public_url": upload_result["public_url"]
-        }
-        
-        lesson_plan = crud.create_lesson_plan(db, LessonPlanCreate(**lesson_plan_data))
-        
-        return {
-            "success": True,
-            "message": "Lesson plan uploaded successfully",
-            "id": lesson_plan.id,
-            "image_url": upload_result["public_url"]
-        }
-        
+        db.add(lesson_plan)
+        db.commit()
+        db.refresh(lesson_plan)
+
+        return {"success": True, "lesson_plan": lesson_plan.to_dict()}
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to upload lesson plan: {str(e)}"
-        )
+        logger.exception("❌ Upload failed")
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.get("/lessonplan/image/{lesson_plan_id}")
 async def get_lesson_plan_image(
