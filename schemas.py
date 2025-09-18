@@ -81,5 +81,31 @@ class ExportRequest(BaseModel):
     approved_by: Optional[str] = None
     approved_at: Optional[datetime] = None
 
+
+# Add to your existing schemas.py
+class LessonPlanCreate(BaseModel):
+    phone: str
+    score: int
+    subject: str
+    feedback: str
+    spaces_file_path: str
+    original_filename: str
+    public_url: str
+
+class LessonPlan(BaseModel):
+    id: int
+    phone: str
+    score: int
+    subject: str
+    feedback: str
+    spaces_file_path: str
+    original_filename: str
+    public_url: str
+    created_at: datetime
+    teacher_name: Optional[str] = None
+    school: Optional[str] = None
+    district: Optional[str] = None
+ 
+
     class Config:
         from_attributes = True
