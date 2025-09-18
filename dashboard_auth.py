@@ -153,3 +153,75 @@ def get_dashboard_user(
         return user
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch user details: {str(e)}")
+    
+
+
+    # dashboard_auth.py - Add OTP verification endpoints for managers
+@router.post("/send-export-otp")
+async def send_export_otp(
+    request_data: dict,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """Send OTP for data export verification (for managers)"""
+    if current_user["role"] != UserRole.MANAGER:
+        raise HTTPException(status_code=403, detail="Only managers can request export OTP")
+    
+    try:
+        phone = request_data.get("phone")
+        user_id = request_data.get("user_id")
+        data_type = request_data.get("data_type")
+        record_count = request_data.get("record_count")
+        
+        if not phone:
+            raise HTTPException(status_code=400, detail="Phone number is required")
+        
+        result = send_otp(phone)
+        if "successfully" not in result.lower():
+            raise HTTPException(status_code=500, detail=result)
+
+        return {"message": "OTP sent successfully for export verification"}
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to send export OTP: {str(e)}")
+
+@router.post("/verify-export-otp")
+async def verify_export_otp(
+    request_data: dict,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """Verify OTP for data export (for managers)"""
+    if current_user["role"] != UserRole.MANAGER:
+        raise HTTPException(status_code=403, detail="Only managers can verify export OTP")
+    
+    try:
+        phone = request_data.get("phone")
+        otp = request_data.get("otp")
+        user_id = request_data.get("user_id")
+        
+        if not phone or not otp:
+            raise HTTPException(status_code=400, detail="Phone and OTP are required")
+        
+        if not verify_otp(phone, otp):
+            raise HTTPException(status_code=400, detail="Invalid OTP")
+        
+        # Create a temporary token for data access
+        access_token = create_access_token(
+            data={
+                "sub": str(user_id), 
+                "role": current_user["role"].value, 
+                "name": current_user.get("name", ""),
+                "export_verified": True,
+                "exp": int((datetime.utcnow() + timedelta(minutes=30)).timestamp())  # 30 minutes access
+            }
+        )
+         
+        return {
+            "verified": True,
+            "access_token": access_token,
+            "token_type": "bearer"
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to verify export OTP: {str(e)}")

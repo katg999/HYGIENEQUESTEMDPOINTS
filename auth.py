@@ -16,7 +16,7 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         user_id: str = payload.get("sub")
         role: str = payload.get("role")
-        name: str = payload.get("name")  # Add this line
+        name: str = payload.get("name")
         
         if user_id is None or role is None:
             raise HTTPException(
@@ -25,7 +25,7 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
                 headers={"WWW-Authenticate": "Bearer"},
             )
         
-        # Return user data including name
+       
         user_data = {"id": int(user_id), "role": UserRole(role)}
         if name:
             user_data["name"] = name
