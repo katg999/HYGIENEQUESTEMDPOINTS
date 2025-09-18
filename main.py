@@ -75,8 +75,8 @@ def list_users(
     try:
         users = crud.get_users(db)
         
-        # Apply role-based masking for fieldworkers
-        if current_user["role"] == UserRole.FIELDWORKER:
+        # Apply role-based masking for fieldworkers and managers
+        if current_user["role"] in [UserRole.FIELDWORKER, UserRole.MANAGER]:
             for user in users:
                 # Mask school name with user ID
                 user.school = f"SCH-{user.id:04d}"
@@ -91,6 +91,7 @@ def list_users(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to retrieve users"
         )
+
 
 # Attendance management endpoints
 @app.post("/attendance", response_model=schemas.Attendance, status_code=status.HTTP_201_CREATED)
@@ -133,8 +134,8 @@ def list_attendance(
                 "school": user.school             # This comes from User table
             }
             
-            # Role-based masking for fieldworkers
-            if current_user["role"] == UserRole.FIELDWORKER:
+            # Role-based masking for fieldworkers and managers
+            if current_user["role"] in [UserRole.FIELDWORKER, UserRole.MANAGER]:
                 # Mask district from Attendance table
                 attendance_data["district"] = f"DIST-{(attendance.id % 100):02d}"
                 # Mask teacher name from User table
