@@ -13,6 +13,7 @@ from models import LessonPlan as LessonPlanModel
 from otp import send_otp, verify_otp
 from auth import get_current_user
 import os
+import schemas
 from spaces_storage import do_spaces
 
 # Create database tables
