@@ -570,6 +570,64 @@ async def delete_lesson_plan(
             detail=f"Failed to delete lesson plan: {str(e)}"
         )
 
+@app.get("/lessonplans/my-school", response_model=List[schemas.LessonPlan])
+def get_lesson_plans_my_school(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """Get lesson plans for the current user's school"""
+    try:
+        # Get the current user's phone from the token
+        user_phone = current_user.get("phone")
+        if not user_phone:
+            raise HTTPException(status_code=400, detail="User phone not found in token")
+        
+        # Find the user in the database to get their school
+        user = db.query(User).filter(User.phone == user_phone).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found in database")
+        
+        school_name = user.school
+        if not school_name:
+            return []
+        
+        # Get all users from this school
+        school_users = db.query(User).filter(User.school == school_name).all()
+        user_phones = [user.phone for user in school_users]
+        
+        if not user_phones:
+            return []
+        
+        # Get lesson plans for these users
+        lesson_plans = db.query(LessonPlan).filter(LessonPlan.phone.in_(user_phones)).all()
+        
+        # Enhance with user information
+        enhanced_plans = []
+        for plan in lesson_plans:
+            user = next((u for u in school_users if u.phone == plan.phone), None)
+            enhanced_plans.append({
+                "id": plan.id,
+                "phone": plan.phone,
+                "score": plan.score,
+                "subject": plan.subject,
+                "feedback": plan.feedback,
+                "spaces_file_path": plan.spaces_file_path,
+                "original_filename": plan.original_filename,
+                "public_url": plan.public_url,
+                "created_at": plan.created_at,
+                "teacher_name": user.name if user else "Unknown",
+                "school": user.school if user else "Unknown",
+                "district": user.district if user else "Unknown"
+            })
+        
+        return enhanced_plans
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve lesson plans: {str(e)}"
+        )
+
 
 
 # Include routers
