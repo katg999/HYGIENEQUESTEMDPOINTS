@@ -518,8 +518,8 @@ async def upload_lesson_plan(
 @app.get("/lessonplan/image/{lesson_plan_id}")
 async def get_lesson_plan_image(
     lesson_plan_id: int,
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    db: Session = Depends(get_db)
+    # Remove: current_user: dict = Depends(get_current_user)
 ):
     """Get the lesson plan image URL"""
     try:
@@ -527,9 +527,6 @@ async def get_lesson_plan_image(
         
         if not lesson_plan:
             raise HTTPException(status_code=404, detail="Lesson plan not found")
-        
-        # For additional security, generate a presigned URL instead of using public URL
-        # presigned_url = do_spaces.generate_presigned_url(lesson_plan.spaces_file_path)
         
         return {
             "image_url": lesson_plan.public_url,
