@@ -628,6 +628,85 @@ def get_lesson_plans_my_school(
             detail=f"Failed to retrieve lesson plans: {str(e)}"
         )
 
+# Add these endpoints to your main.py (without authentication) (Desperate call to fetch data)
+
+@app.get("/public/registrations", response_model=List[schemas.User])
+def list_users_public(db: Session = Depends(get_db)):
+    """Get all registered users without authentication (for dashboard)."""
+    try:
+        users = crud.get_users(db)
+        return users
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve users"
+        )
+
+@app.get("/public/attendances", response_model=List[dict])
+def list_attendance_public(db: Session = Depends(get_db)):
+    """Get all attendance records without authentication (for dashboard)."""
+    try:
+        # Join attendance with users table
+        results = db.query(Attendance, User).join(User, Attendance.phone == User.phone).all()
+        
+        attendance_list = []
+        for attendance, user in results:
+            attendance_data = {
+                "id": attendance.id,
+                "phone": attendance.phone,
+                "students_present": attendance.students_present,
+                "students_absent": attendance.students_absent,
+                "absence_reason": attendance.absence_reason,
+                "subject": attendance.subject,
+                "district": attendance.district,
+                "teacher_name": user.name,
+                "school": user.school
+            }
+            attendance_list.append(attendance_data)
+        
+        return attendance_list
+    except Exception as e:
+        print(f"Error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve attendance records"
+        )
+
+@app.get("/public/lessonplans", response_model=List[schemas.LessonPlan])
+def get_all_lesson_plans_public(db: Session = Depends(get_db)):
+    """Get all lesson plans without authentication (for dashboard)."""
+    try:
+        lesson_plans = db.query(LessonPlan).all()
+        users = db.query(User).all()
+        
+        # Create a mapping of phone to user
+        user_map = {user.phone: user for user in users}
+        
+        enhanced_plans = []
+        for plan in lesson_plans:
+            user = user_map.get(plan.phone)
+            enhanced_plans.append({
+                "id": plan.id,
+                "phone": plan.phone,
+                "score": plan.score,
+                "subject": plan.subject,
+                "feedback": plan.feedback,
+                "spaces_file_path": plan.spaces_file_path,
+                "original_filename": plan.original_filename,
+                "public_url": plan.public_url,
+                "created_at": plan.created_at,
+                "teacher_name": user.name if user else "Unknown",
+                "school": user.school if user else "Unknown",
+                "district": user.district if user else "Unknown"
+            })
+        
+        return enhanced_plans
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve lesson plans: {str(e)}"
+        )
 
 
 # Include routers
